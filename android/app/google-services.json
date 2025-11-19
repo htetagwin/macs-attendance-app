@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "22414908830",
+    "project_id": "macs-fhsu",
+    "storage_bucket": "macs-fhsu.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22414908830:android:91ca5c93e593775e5f4a8f",
+        "android_client_info": {
+          "package_name": "com.example.simple_attendance_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgRSe4M1scOFIUFvDNuNAm4Z20uqhkDgA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

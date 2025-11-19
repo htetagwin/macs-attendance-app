@@ -1,0 +1,10 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+const Color primaryBlack = Color(0xFF000000);
+const Color accentGold = Color(0xFFFDB913);
+const Color backgroundWhite = Color(0xFFFFFFFF);
+const Color lightGrey = Color(0xFFF5F5F5);
+const Color errorRed = Color(0xFFFF0000);
+const Color successGreen = Color.fromARGB(255, 3, 61, 3);
+const Color disabledGrey = Color(0xFFB0BEC5);
+const Color textWhite = Color(0xFFFFFFFF);
