@@ -30,10 +30,9 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
   String? _shortCode;
   String? _userRole;
 
-  bool _canCheckIn = false;
-  bool _canGiveFeedback = false;
-  String? _checkInMessage;
-  String? _feedbackMessage;
+  // Controlled only by the manual toggles
+  bool _attendanceOpen = false;
+  bool _feedbackOpen = false;
 
   final TextEditingController _codeController = TextEditingController();
   MobileScannerController? _scannerController;
@@ -51,7 +50,6 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     super.dispose();
   }
 
-  //  LOAD SEMINAR + USER DATA
   Future<void> _loadSeminarData() async {
     try {
       setState(() => _isLoading = true);
@@ -65,47 +63,8 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
       final data = seminarDoc.data()!;
       _shortCode = (data['attendance_code_short'] as String?)?.trim().toUpperCase();
 
-      final now = DateTime.now();
-      final seminarDate = (data['date'] as Timestamp).toDate();
-      final presentationTime = data['presentation_time'] != null
-          ? (data['presentation_time'] as Timestamp).toDate()
-          : seminarDate;
-
-      final attStart = data['attendance_start_time'] != null
-          ? (data['attendance_start_time'] as Timestamp).toDate()
-          : seminarDate.subtract(const Duration(hours: 1));
-      final attEnd = data['attendance_end_time'] != null
-          ? (data['attendance_end_time'] as Timestamp).toDate()
-          : seminarDate.add(const Duration(hours: 2));
-
-      final fbStart = data['feedback_start_time'] != null
-          ? (data['feedback_start_time'] as Timestamp).toDate()
-          : presentationTime;
-      final fbEnd = data['feedback_end_time'] != null
-          ? (data['feedback_end_time'] as Timestamp).toDate()
-          : presentationTime.add(const Duration(hours: 24));
-
-      final attOpenManual = data['attendance_open_manual'] ?? true;
-      final fbOpenManual = data['feedback_open_manual'] ?? true;
-
-      _canCheckIn = attOpenManual && now.isAfter(attStart) && now.isBefore(attEnd);
-      _canGiveFeedback = fbOpenManual && now.isAfter(fbStart) && now.isBefore(fbEnd);
-
-      _checkInMessage = attOpenManual
-          ? (now.isBefore(attStart)
-              ? 'Opens at ${DateFormat('h:mm a').format(attStart)}'
-              : now.isAfter(attEnd)
-                  ? 'Check-in closed'
-                  : null)
-          : 'Check-in disabled by admin';
-
-      _feedbackMessage = fbOpenManual
-          ? (now.isBefore(fbStart)
-              ? 'Opens after presentation'
-              : now.isAfter(fbEnd)
-                  ? 'Feedback closed'
-                  : null)
-          : 'Feedback disabled by admin';
+      _attendanceOpen = data['attendance_open_manual'] ?? false;
+      _feedbackOpen = data['feedback_open_manual'] ?? false;
 
       final user = _auth.currentUser;
       if (user != null) {
@@ -141,16 +100,14 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     }
   }
 
-  //  VERIFY SHORT CODE (case-insensitive)
   bool _verifyShortCode(String input) {
     if (_shortCode == null) return false;
     return input.trim().toUpperCase() == _shortCode;
   }
 
-  //  RECORD ATTENDANCE
   Future<void> _recordAttendance(String enteredCode, String method) async {
     final user = _auth.currentUser;
-    if (user == null || _hasTakenAttendance || !_canCheckIn) return;
+    if (user == null || _hasTakenAttendance || !_attendanceOpen) return;
 
     final codeToSave = method == 'QR' ? _shortCode! : enteredCode.trim().toUpperCase();
 
@@ -182,9 +139,8 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: bg));
   }
 
-  //  QR SCANNER
   void _showQRScanner() {
-    if (!_canCheckIn || _hasTakenAttendance) return;
+    if (!_attendanceOpen || _hasTakenAttendance) return;
 
     _scannerController = MobileScannerController();
     showDialog(
@@ -237,21 +193,17 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     });
   }
 
-  //  MANUAL CODE ENTRY
   void _showManualCheckin() {
-    if (!_canCheckIn || _hasTakenAttendance) return;
+    if (!_attendanceOpen || _hasTakenAttendance) return;
     _codeController.clear();
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (_) => StatefulBuilder(
         builder: (context, dialogSetState) => AlertDialog(
           backgroundColor: backgroundWhite,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            'Enter 5-Character Code',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+          title: const Text('Enter 5-Character Code', style: TextStyle(fontWeight: FontWeight.bold)),
           content: TextField(
             controller: _codeController,
             textCapitalization: TextCapitalization.characters,
@@ -262,13 +214,10 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
               counterText: '${_codeController.text.length}/5',
             ),
-            onChanged: (_) => dialogSetState(() {}), // Critical: Rebuilds dialog
+            onChanged: (_) => dialogSetState(() {}),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: accentGold),
               onPressed: _codeController.text.length == 5
@@ -285,12 +234,15 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     );
   }
 
-  //  FEEDBACK DIALOG
   void _showFeedbackDialog() {
-    if (!_canGiveFeedback || _hasGivenFeedback) return;
+    if (!_feedbackOpen || _hasGivenFeedback) return;
 
     final ratings = Map<String, int>.from(_userRatings ?? {
-      'Introduction': 0, 'Content': 0, 'Flow': 0, 'Presentation': 0, 'Engagement': 0,
+      'Introduction': 0,
+      'Content': 0,
+      'Flow': 0,
+      'Presentation': 0,
+      'Engagement': 0,
     });
     String comment = '';
 
@@ -311,13 +263,13 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(5, (i) => GestureDetector(
-                        onTap: () => setState(() => ratings[cat] = i + 1),
-                        child: Icon(
-                          i < ratings[cat]! ? Icons.star : Icons.star_border,
-                          color: accentGold,
-                          size: 24,
-                        ),
-                      )),
+                            onTap: () => setState(() => ratings[cat] = i + 1),
+                            child: Icon(
+                              i < ratings[cat]! ? Icons.star : Icons.star_border,
+                              color: accentGold,
+                              size: 24,
+                            ),
+                          )),
                     ),
                   );
                 }),
@@ -365,7 +317,7 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     );
   }
 
-  //  UI HELPERS
+  // UI HELPERS
   Widget _infoRow(IconData icon, String label, String value, {bool isLink = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -423,7 +375,6 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
     );
   }
 
-  //  BUILD
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -452,26 +403,19 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
 
     final data = _seminar!;
     final date = (data['date'] as Timestamp).toDate();
-    final presentationTime = data['presentation_time'] != null
-        ? (data['presentation_time'] as Timestamp).toDate()
-        : date;
 
     return Scaffold(
       backgroundColor: backgroundWhite,
       appBar: AppBar(
         backgroundColor: primaryBlack,
         title: Text('Seminar Details', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: titleSize)),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: accentGold),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: IconButton(icon: Icon(Icons.arrow_back, color: accentGold), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(padding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Seminar Info Card
             Card(
               elevation: 6,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -485,7 +429,6 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
                     if (data['presenter'] != null) _infoRow(Icons.person, 'Presenter', data['presenter']),
                     if (data['advisor'] != null) _infoRow(Icons.school, 'Advisor', data['advisor']),
                     _infoRow(Icons.event, 'Date', DateFormat('EEEE, MMM d, yyyy').format(date)),
-                    _infoRow(Icons.access_time, 'Time', DateFormat('h:mm a').format(presentationTime)),
                     if (data['video_link']?.toString().isNotEmpty == true)
                       _infoRow(Icons.link, 'Recording', data['video_link'], isLink: true),
                     SizedBox(height: 16),
@@ -502,8 +445,8 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
             SizedBox(height: 12),
             if (_hasTakenAttendance)
               _statusChip('Checked In', Icons.check_circle, successGreen)
-            else if (!_canCheckIn)
-              _statusChip(_checkInMessage!, Icons.schedule, Colors.orange)
+            else if (!_attendanceOpen)
+              _statusChip('Check-in disabled by admin', Icons.lock, Colors.orange)
             else ...[
               _actionButton('Scan QR Code', Icons.qr_code_scanner, _showQRScanner),
               SizedBox(height: 12),
@@ -517,8 +460,8 @@ class _SeminarDetailPageState extends State<SeminarDetailPage> {
             SizedBox(height: 12),
             if (_hasGivenFeedback)
               _statusChip('Submitted', Icons.rate_review, successGreen)
-            else if (!_canGiveFeedback)
-              _statusChip(_feedbackMessage!, Icons.schedule, Colors.orange)
+            else if (!_feedbackOpen)
+              _statusChip('Feedback disabled by admin', Icons.lock, Colors.orange)
             else
               _actionButton('Give Feedback', Icons.rate_review, _showFeedbackDialog),
           ],

@@ -36,7 +36,6 @@ class DatabaseService {
     ).join();
   }
 
-  // ADD SEMINAR
   Future<Map<String, String>> addSeminar(
     Map<String, dynamic> seminarData,
   ) async {
@@ -262,8 +261,9 @@ class DatabaseService {
         .collection('users')
         .doc(_auth.currentUser!.uid)
         .get();
-    if (!doc.exists || doc['role'] != 'admin')
+    if (!doc.exists || doc['role'] != 'admin') {
       throw Exception('Admin access required');
+    }
   }
 
   void _cleanupUser(UserCredential? cred) {

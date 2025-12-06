@@ -27,7 +27,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
   String _advisor = '';
   String _videoLink = '';
   DateTime _selectedDate = DateTime.now();
-  TimeOfDay _presentationTime = TimeOfDay.now();
   int _maxAttendees = 0;
   String _message = '';
 
@@ -52,26 +51,7 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     }
   }
 
-  Future<void> _selectTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _presentationTime,
-      builder: (context, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: accentGold,
-            onPrimary: primaryBlack,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null && picked != _presentationTime) {
-      setState(() => _presentationTime = picked);
-    }
-  }
-
-  //  PRINT QR CODE
+  // PRINT QR CODE
   Future<void> _printQRCode(String seminarId, String title, String shortCode) async {
     final pdf = pw.Document();
     final qrImage = await QrPainter(
@@ -167,7 +147,7 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     );
   }
 
-  //  ADD / EDIT DIALOG (Manual Only!)
+  // ADD / EDIT DIALOG
   Future<void> _showAddEditDialog({String? id, Map<String, dynamic>? data}) async {
     _title = data?['title'] ?? '';
     _description = data?['description'] ?? '';
@@ -175,9 +155,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     _advisor = data?['advisor'] ?? '';
     _videoLink = data?['video_link'] ?? '';
     _selectedDate = (data?['date'] as Timestamp?)?.toDate() ?? DateTime.now();
-    _presentationTime = data?['presentation_time'] != null
-        ? TimeOfDay.fromDateTime((data!['presentation_time'] as Timestamp).toDate())
-        : TimeOfDay.now();
     _maxAttendees = data?['max_attendees'] ?? 0;
 
     await showDialog(
@@ -201,7 +178,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
 
                 const SizedBox(height: 16),
                 _dateTile('Seminar Date', _selectedDate, _selectDate),
-                _timeTile('Presentation Time', _presentationTime, _selectTime),
 
                 const SizedBox(height: 16),
                 _field('Max Attendees (0 = unlimited)', _maxAttendees > 0 ? _maxAttendees.toString() : '',
@@ -226,13 +202,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
                 'advisor': _advisor.trim().isEmpty ? null : _advisor.trim(),
                 'video_link': _videoLink.trim().isEmpty ? null : _videoLink.trim(),
                 'date': Timestamp.fromDate(_selectedDate),
-                'presentation_time': Timestamp.fromDate(DateTime(
-                  _selectedDate.year,
-                  _selectedDate.month,
-                  _selectedDate.day,
-                  _presentationTime.hour,
-                  _presentationTime.minute,
-                )),
                 'max_attendees': _maxAttendees,
                 'attendance_open_manual': true,
                 'feedback_open_manual': true,
@@ -261,7 +230,7 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     );
   }
 
-  //  UI WIDGETS
+  // UI WIDGETS
   Widget _field(String label, String init, Function(String) onChange,
       {int maxLines = 1, String? Function(String?)? validator, TextInputType? keyboardType}) {
     return Padding(
@@ -305,17 +274,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     );
   }
 
-  Widget _timeTile(String label, TimeOfDay time, Future<void> Function() onTap) {
-    return ListTile(
-      leading: Icon(Icons.access_time, color: accentGold),
-      title: Text('$label: ${time.format(context)}'),
-      trailing: Icon(Icons.edit, color: accentGold),
-      tileColor: Colors.grey[50],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      onTap: onTap,
-    );
-  }
-
   Future<void> _toggleManual(String id, String field, bool value) async {
     await _db.firestore.collection('seminars').doc(id).update({field: value});
   }
@@ -338,7 +296,6 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
     }
   }
 
-  //  BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -463,7 +420,7 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const Text('Attendance', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        Switch(value: attOpen, activeColor: successGreen, onChanged: (v) => _toggleManual(doc.id, 'attendance_open_manual', v)),
+                                        Switch(value: attOpen, activeThumbColor: successGreen, onChanged: (v) => _toggleManual(doc.id, 'attendance_open_manual', v)),
                                       ],
                                     ),
                                   ),
@@ -472,7 +429,7 @@ class _AddSeminarPageState extends State<AddSeminarPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const Text('Feedback', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        Switch(value: fbOpen, activeColor: successGreen, onChanged: (v) => _toggleManual(doc.id, 'feedback_open_manual', v)),
+                                        Switch(value: fbOpen, activeThumbColor: successGreen, onChanged: (v) => _toggleManual(doc.id, 'feedback_open_manual', v)),
                                       ],
                                     ),
                                   ),
